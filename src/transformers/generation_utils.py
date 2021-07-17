@@ -1626,7 +1626,8 @@ class GenerationMixin:
             if eos_token_id is not None:
                 assert pad_token_id is not None, "If eos_token_id is defined, make sure that pad_token_id is defined."
                 next_tokens = next_tokens * unfinished_sequences + pad_token_id * (1 - unfinished_sequences)
-
+                
+            
             # update generated ids, model inputs, and length for next step
             input_ids = torch.cat([input_ids, next_tokens[:, None]], dim=-1)
             model_kwargs = self._update_model_kwargs_for_generation(
@@ -1641,10 +1642,13 @@ class GenerationMixin:
             # stop when each sentence is finished, or if we exceed the maximum length
             if unfinished_sequences.max() == 0 or stopping_criteria(input_ids, scores):
                 if not synced_gpus:
+                    yield next_tokens, True #streaming tokens one by one
                     break
                 else:
                     this_peer_finished = True
-
+            else:
+                
+                yield next_tokens, False #streaming tokens one by one
         if return_dict_in_generate:
             if self.config.is_encoder_decoder:
                 return SampleEncoderDecoderOutput(
