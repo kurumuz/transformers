@@ -328,7 +328,7 @@ class GPTNeoSelfAttention(nn.Module, GPTNeoAttentionMixin):
                 query = torch.cat([q_rot, q_pass], dim=-1)
             elif self.rotary:
                 key = apply_rotary_pos_emb(key, (self.sin, self.cos), offset=offset).to(key.dtype)
-                query = apply_rotary_pos_emb(query, (self.sin, self.cos), offset=offset).to(queue.dtype)
+                query = apply_rotary_pos_emb(query, (self.sin, self.cos), offset=offset).to(query.dtype)
             key = key.permute(0, 2, 1, 3)
             query = query.permute(0, 2, 1, 3)
 
@@ -802,7 +802,7 @@ class GPTNeoModel(GPTNeoPreTrainedModel):
     GPT_NEO_START_DOCSTRING,
 )
 class GPTNeoForCausalLM(GPTNeoPreTrainedModel):
-    _keys_to_ignore_on_load_missing = [r"h\.\d+\.attn\.masked_bias", r"h\.\d+\.attn\.attention\.scale_attn", r"h\.\d+\.attn\.attention\.(sin|cos)", r"lm_head\.weight", r"h\.\d+\.attn\.attention\.bias"]
+    _keys_to_ignore_on_load_missing = [r"h\.\d+\.attn\.attention\.masked_bias", r"h\.\d+\.attn\.masked_bias", r"h\.\d+\.attn\.attention\.scale_attn", r"h\.\d+\.attn\.attention\.(sin|cos)", r"lm_head\.weight", r"h\.\d+\.attn\.attention\.bias"]
     _keys_to_ignore_on_save = [r"lm_head.weight"]
 
     def __init__(self, config):

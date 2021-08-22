@@ -176,11 +176,11 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
             <https://arxiv.org/pdf/1909.05858.pdf>`__ for more details.
     """
 
-    def __init__(self, penalty: float=1.0, m=3.33, penalize_last=250, alpha_frequency=None, alpha_presence=None):
+    def __init__(self, penalty: float=1.0, m=3.33, penalize_last=250, alpha_frequency=None, alpha_presence=None, whitelist=None):
         if not isinstance(penalty, float) or not (penalty > 0):
             raise ValueError(f"`penalty` has to be a strictly positive float, but is {penalty}")
 
-        self.penalty = penalty
+        self.penalty = 1.0 if penalty < 1.0 else penalty
         self.raw_penalty = penalty
         self.penalize_last = None
         if not m is None and not penalize_last is None:
@@ -191,8 +191,20 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
         self.alpha_frequency = alpha_frequency if alpha_frequency is not None and alpha_frequency > 0.0 else None
         self.alpha_presence = alpha_presence if alpha_presence is not None and alpha_presence > 0.0 else None
         self.alpha_enable = self.alpha_frequency is not None or self.alpha_presence is not None
+        self.whitelist = None
+        self.whitelist_list = None
+        if whitelist is not None:
+            self.whitelist_list = whitelist
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+        if self.whitelist is None and self.whitelist_list is not None:
+            self.whitelist_list = list(filter(lambda x: x >= 0 and x < scores.shape[1], self.whitelist_list))
+            if len(self.whitelist_list) > 0:
+                self.whitelist = torch.tensor(self.whitelist_list).long().sort()[0]
+                self.whitelist = self.whitelist.to(input_ids.device)
+        if self.whitelist is not None:
+            unpenalized = scores.gather(1, self.whitelist.view(1, -1))
+
         if self.raw_penalty > 1.0:
             if not self.penalize_last is None:
                 penality_len = min(input_ids.shape[1], self.penalize_last)
@@ -221,6 +233,10 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
                 scores -= c * self.alpha_frequency
             if self.alpha_presence:
                 scores[c > 0] -= self.alpha_presence
+
+        if self.whitelist is not None:
+            scores.scatter_(1, self.whitelist.view(1, -1), unpenalized)
+
         return scores
 
 
@@ -468,7 +484,7 @@ class NoBadWordsLogitsProcessor(LogitsProcessor):
                 f"Each list in `bad_words_ids` has to be a list of positive integers, but is {bad_words_ids}."
             )
 
-        self.bad_words_ids = list(filter(lambda bad_token_seq: bad_token_seq != [eos_token_id], bad_words_ids))
+        self.bad_words_ids = bad_words_ids #list(filter(lambda bad_token_seq: bad_token_seq != [eos_token_id], bad_words_ids))
 
         for banned_token_seq in self.bad_words_ids:
             assert len(banned_token_seq) > 0, f"Banned words token sequences {bad_words_ids} cannot have an empty list"
