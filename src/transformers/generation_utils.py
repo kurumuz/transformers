@@ -1437,6 +1437,7 @@ class GenerationMixin:
         max_length: Optional[int] = None,
         pad_token_id: Optional[int] = None,
         eos_token_id: Optional[int] = None,
+        stream: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         output_scores: Optional[bool] = None,
@@ -1547,6 +1548,7 @@ class GenerationMixin:
         output_scores = output_scores if output_scores is not None else self.config.output_scores
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_nonzero_probs = True if output_nonzero_probs is not None and output_nonzero_probs else False
+        stream = stream if stream is not None else False
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
@@ -1654,13 +1656,14 @@ class GenerationMixin:
             # stop when each sentence is finished, or if we exceed the maximum length
             if unfinished_sequences.max() == 0 or stopping_criteria(input_ids, scores):
                 if not synced_gpus:
-                    yield next_tokens, True #streaming tokens one by one
+                    if stream:
+                        yield next_tokens, True #streaming tokens one by one
                     break
                 else:
                     this_peer_finished = True
             else:
-                
-                yield next_tokens, False #streaming tokens one by one
+                if stream:
+                    yield next_tokens, False #streaming tokens one by one
         if return_dict_in_generate:
             if self.config.is_encoder_decoder:
                 return SampleEncoderDecoderOutput(
