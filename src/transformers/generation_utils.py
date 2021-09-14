@@ -22,6 +22,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 import torch
 import torch.distributed as dist
 from torch.nn import functional as F
+from icecream import ic
 
 from .file_utils import ModelOutput
 from .generation_beam_search import BeamScorer, BeamSearchScorer
@@ -1658,6 +1659,7 @@ class GenerationMixin:
                 unfinished_sequences = unfinished_sequences.mul((next_tokens != eos_token_id).long())
 
             # stop when each sentence is finished, or if we exceed the maximum length
+            #if int(next_tokens[0]) == eos_token_id: #will not work with batching
             if unfinished_sequences.max() == 0:
                 yield next_tokens, True
                 break
