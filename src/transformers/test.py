@@ -1,3 +1,3 @@
-import sentence_detect
+import transformers.sentence_detect
 
-sentence_detect.is_sentence_tokens([12, 13, 14])
+transformers.sentence_detect.is_sentence_tokens([12, 13, 14])
