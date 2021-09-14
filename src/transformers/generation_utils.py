@@ -1661,17 +1661,22 @@ class GenerationMixin:
             # stop when each sentence is finished, or if we exceed the maximum length
             #if int(next_tokens[0]) == eos_token_id: #will not work with batching
             if unfinished_sequences.max() == 0:
+                ic()
                 yield next_tokens, True
                 break
                 
             if stopping_criteria(input_ids, scores) and not extra_generation:
+                ic(transformers.sentence_detect.is_sentence_tokens(token_accum))
+                ic(extra_token_counter)
+                token_accum.append(int(next_tokens[0]))
                 if generate_until_sentence and not transformers.sentence_detect.is_sentence_tokens(token_accum) and extra_token_counter < 20:
+                    ic()
                     yield next_tokens, False
                     extra_generation = True
 
                 else:
                     if not synced_gpus:
-                        token_accum.append(int(next_tokens[0]))
+                        ic(int(next_tokens[0]))
                         yield next_tokens, True #streaming tokens one by one
                         break
                     else:
@@ -1679,26 +1684,31 @@ class GenerationMixin:
             else:
                 
                 if extra_generation and extra_token_counter < 20:
+                    ic()
                     token_accum.append(int(next_tokens[0]))
                     if transformers.sentence_detect.is_sentence_tokens(token_accum):
+                        ic()
                         yield next_tokens, True
                         extra_token_counter += 1
-                        #print("extra " + str(extra_token_counter), flush=True)
+                        print("extra " + str(extra_token_counter), flush=True)
                         break
 
                     else:
+                        ic()
                         yield next_tokens, False
                         extra_token_counter += 1
-                        #print("extra " + str(extra_token_counter), flush=True)
+                        print("extra " + str(extra_token_counter), flush=True)
 
                 elif extra_generation and extra_token_counter >= 20:
+                    ic()
                     yield next_tokens, True
                     extra_token_counter += 1
-                    #print("extra " + str(extra_token_counter), flush=True)
+                    print("extra " + str(extra_token_counter), flush=True)
                     break
 
                 elif not extra_generation:
                     token_accum.append(int(next_tokens[0]))
+                    ic(int(next_tokens[0]))
                     yield next_tokens, False #streaming tokens one by one
 
         if return_dict_in_generate:
