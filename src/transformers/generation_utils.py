@@ -1658,7 +1658,11 @@ class GenerationMixin:
                 unfinished_sequences = unfinished_sequences.mul((next_tokens != eos_token_id).long())
 
             # stop when each sentence is finished, or if we exceed the maximum length
-            if unfinished_sequences.max() == 0 or stopping_criteria(input_ids, scores) and not extra_generation:
+            if unfinished_sequences.max() == 0:
+                yield next_tokens, True
+                break
+                
+            if stopping_criteria(input_ids, scores) and not extra_generation:
                 if generate_until_sentence and not transformers.sentence_detect.is_sentence_tokens(token_accum) and extra_token_counter < 20:
                     yield next_tokens, False
                     extra_generation = True
