@@ -1444,6 +1444,7 @@ class GenerationMixin:
         return_dict_in_generate: Optional[bool] = None,
         synced_gpus: Optional[bool] = None,
         embs: Optional[List[Tuple[int, torch.FloatTensor]]] = None,
+        generate_until_sentence: Optional[bool] = None,
         **model_kwargs,
     ) -> Union[SampleOutput, torch.LongTensor]:
         r"""
@@ -1547,6 +1548,7 @@ class GenerationMixin:
         output_scores = output_scores if output_scores is not None else self.config.output_scores
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_nonzero_probs = True if output_nonzero_probs is not None and output_nonzero_probs else False
+        generate_until_sentence = True if generate_until_sentence is not None and generate_until_sentence else False
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
@@ -1573,6 +1575,7 @@ class GenerationMixin:
         cur_len = input_ids.shape[-1]
 
         this_peer_finished = False  # used by synced_gpus only
+        extra_token_counter = 0
         # auto-regressive generation
         while True:
 
@@ -1653,13 +1656,18 @@ class GenerationMixin:
 
             # stop when each sentence is finished, or if we exceed the maximum length
             if unfinished_sequences.max() == 0 or stopping_criteria(input_ids, scores):
-                if not synced_gpus:
-                    yield next_tokens, True #streaming tokens one by one
-                    break
+                if generate_until_sentence and not is_sentence() and extra_token_counter < 20:
+                    yield next_tokens, False
+                    extra_token_counter += 1
                 else:
-                    this_peer_finished = True
+                    if not synced_gpus:
+                        yield next_tokens, True #streaming tokens one by one
+                        break
+                    else:
+                        this_peer_finished = True
             else:
                 yield next_tokens, False #streaming tokens one by one
+    
         if return_dict_in_generate:
             if self.config.is_encoder_decoder:
                 return SampleEncoderDecoderOutput(
