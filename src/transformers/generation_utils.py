@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import warnings
+import sentence_detect
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -1575,6 +1576,7 @@ class GenerationMixin:
         cur_len = input_ids.shape[-1]
 
         this_peer_finished = False  # used by synced_gpus only
+        token_accum = []
         extra_token_counter = 0
         # auto-regressive generation
         while True:
@@ -1656,16 +1658,19 @@ class GenerationMixin:
 
             # stop when each sentence is finished, or if we exceed the maximum length
             if unfinished_sequences.max() == 0 or stopping_criteria(input_ids, scores):
-                if generate_until_sentence and not is_sentence() and extra_token_counter < 20:
+                if generate_until_sentence and not sentence_detect.is_sentence_tokens(token_accum) and extra_token_counter < 20:
+                    token_accum.append(int(next_tokens[0]))
                     yield next_tokens, False
                     extra_token_counter += 1
                 else:
                     if not synced_gpus:
+                        token_accum.append(int(next_tokens[0]))
                         yield next_tokens, True #streaming tokens one by one
                         break
                     else:
                         this_peer_finished = True
             else:
+                token_accum.append(int(next_tokens[0]))
                 yield next_tokens, False #streaming tokens one by one
     
         if return_dict_in_generate:
