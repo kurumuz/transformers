@@ -90,6 +90,7 @@ def is_sentence(text, values):
 
 def is_sentence_tokens(tokens):
     text = tokenizer.decode(tokens)
+    #ic(text)
     features = create_feature_list(text)
     out = is_sentence(text, features)
     return out

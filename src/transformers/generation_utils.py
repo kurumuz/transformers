@@ -1684,14 +1684,15 @@ class GenerationMixin:
                         extra_token_counter += 1
                         print("extra " + str(extra_token_counter), flush=True)
 
-                if extra_generation and extra_token_counter >= 20:
+                elif extra_generation and extra_token_counter >= 20:
                     yield next_tokens, True
                     extra_token_counter += 1
                     print("extra " + str(extra_token_counter), flush=True)
                     break
 
-                yield next_tokens, False #streaming tokens one by one
-                token_accum.append(int(next_tokens[0]))
+                elif not extra_generation:
+                    token_accum.append(int(next_tokens[0]))
+                    yield next_tokens, False #streaming tokens one by one
 
         if return_dict_in_generate:
             if self.config.is_encoder_decoder:
