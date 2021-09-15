@@ -77,12 +77,12 @@ def get_last_end_char(values):
 
 def is_sentence(text, values):
     last_end_char = get_last_end_char(values)
-    ic(last_end_char)
+    #ic(last_end_char)
     if last_end_char[0] == len(text)-1:
         return True
     else:
         last_closing_char = get_last_closing_char(values)
-        ic(last_closing_char)
+        #ic(last_closing_char)
         if last_end_char[0] == len(text)-2 and last_closing_char[0] == len(text)-1:
             return True
 
@@ -90,11 +90,11 @@ def is_sentence(text, values):
 
 def is_sentence_tokens(tokens):
     text = tokenizer.decode(tokens)
-    ic(text)
+    #ic(text)
     features = create_feature_list(text)
-    ic(features)
+    #ic(features)
     out = is_sentence(text, features)
-    ic(out)
+    #ic(out)
     return out
 
 if __name__ == '__main__':
