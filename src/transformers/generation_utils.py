@@ -15,12 +15,14 @@
 # limitations under the License.
 
 import warnings
+import transformers.sentence_detect
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import torch
 import torch.distributed as dist
 from torch.nn import functional as F
+from icecream import ic
 
 from .file_utils import ModelOutput
 from .generation_beam_search import BeamScorer, BeamSearchScorer
@@ -1444,6 +1446,7 @@ class GenerationMixin:
         return_dict_in_generate: Optional[bool] = None,
         synced_gpus: Optional[bool] = None,
         embs: Optional[List[Tuple[int, torch.FloatTensor]]] = None,
+        generate_until_sentence: Optional[bool] = None,
         **model_kwargs,
     ) -> Union[SampleOutput, torch.LongTensor]:
         r"""
@@ -1547,6 +1550,7 @@ class GenerationMixin:
         output_scores = output_scores if output_scores is not None else self.config.output_scores
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_nonzero_probs = True if output_nonzero_probs is not None and output_nonzero_probs else False
+        generate_until_sentence = True if generate_until_sentence is not None and generate_until_sentence else False
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
@@ -1573,6 +1577,9 @@ class GenerationMixin:
         cur_len = input_ids.shape[-1]
 
         this_peer_finished = False  # used by synced_gpus only
+        token_accum = []
+        extra_token_counter = 0
+        extra_generation = False
         # auto-regressive generation
         while True:
 
@@ -1638,7 +1645,8 @@ class GenerationMixin:
             if eos_token_id is not None:
                 assert pad_token_id is not None, "If eos_token_id is defined, make sure that pad_token_id is defined."
                 next_tokens = next_tokens * unfinished_sequences + pad_token_id * (1 - unfinished_sequences)
-
+                
+            
             # update generated ids, model inputs, and length for next step
             input_ids = torch.cat([input_ids, next_tokens[:, None]], dim=-1)
             model_kwargs = self._update_model_kwargs_for_generation(
@@ -1651,11 +1659,57 @@ class GenerationMixin:
                 unfinished_sequences = unfinished_sequences.mul((next_tokens != eos_token_id).long())
 
             # stop when each sentence is finished, or if we exceed the maximum length
-            if unfinished_sequences.max() == 0 or stopping_criteria(input_ids, scores):
-                if not synced_gpus:
-                    break
+            #if int(next_tokens[0]) == eos_token_id: #will not work with batching
+            if unfinished_sequences.max() == 0:
+                #ic()
+                yield next_tokens, True
+                break
+                
+            if stopping_criteria(input_ids, scores) and not extra_generation:
+                #ic(transformers.sentence_detect.is_sentence_tokens(token_accum))
+                #ic(extra_token_counter)
+                token_accum.append(int(next_tokens[0]))
+                if generate_until_sentence and not transformers.sentence_detect.is_sentence_tokens(token_accum) and extra_token_counter < 20:
+                    #ic()
+                    yield next_tokens, False
+                    extra_generation = True
+
                 else:
-                    this_peer_finished = True
+                    if not synced_gpus:
+                        #ic(int(next_tokens[0]))
+                        yield next_tokens, True #streaming tokens one by one
+                        break
+                    else:
+                        this_peer_finished = True
+            else:
+                
+                if extra_generation and extra_token_counter < 20:
+                    #ic()
+                    token_accum.append(int(next_tokens[0]))
+                    if transformers.sentence_detect.is_sentence_tokens(token_accum):
+                        #ic()
+                        yield next_tokens, True
+                        extra_token_counter += 1
+                        #print("extra " + str(extra_token_counter), flush=True)
+                        break
+
+                    else:
+                        #ic()
+                        yield next_tokens, False
+                        extra_token_counter += 1
+                        #print("extra " + str(extra_token_counter), flush=True)
+
+                elif extra_generation and extra_token_counter >= 20:
+                    #ic()
+                    yield next_tokens, True
+                    extra_token_counter += 1
+                    #print("extra " + str(extra_token_counter), flush=True)
+                    break
+
+                elif not extra_generation:
+                    token_accum.append(int(next_tokens[0]))
+                    #ic(int(next_tokens[0]))
+                    yield next_tokens, False #streaming tokens one by one
 
         if return_dict_in_generate:
             if self.config.is_encoder_decoder:
