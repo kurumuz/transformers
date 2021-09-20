@@ -1690,20 +1690,20 @@ class GenerationMixin:
                         #ic()
                         yield next_tokens, True
                         extra_token_counter += 1
-                        print("extra " + str(extra_token_counter), flush=True)
+                        #print("extra " + str(extra_token_counter), flush=True)
                         break
 
                     else:
                         #ic()
                         yield next_tokens, False
                         extra_token_counter += 1
-                        print("extra " + str(extra_token_counter), flush=True)
+                        #print("extra " + str(extra_token_counter), flush=True)
 
                 elif extra_generation and extra_token_counter >= 20:
                     #ic()
                     yield next_tokens, True
                     extra_token_counter += 1
-                    print("extra " + str(extra_token_counter), flush=True)
+                    #print("extra " + str(extra_token_counter), flush=True)
                     break
 
                 elif not extra_generation:
