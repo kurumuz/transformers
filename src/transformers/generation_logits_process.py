@@ -304,28 +304,10 @@ class TopALogitsWarper(LogitsWarper):
         self.filter_value = filter_value
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
-        probs = torch.functional.softmax(scores, dim=-1)
+        probs = torch.nn.functional.softmax(scores, dim=-1)
         limit = torch.pow(torch.max(probs), 2.0) * self.z
-        sorted_logits, sorted_indices = torch.sort(scores, descending=True)
-        d = sorted_logits.softmax(dim=-1)
-        d = d[:, 1:] - d[:, :-1]
-        d = d[:, 1:] - d[:, :-1]
-        d = d.abs()
-        d = d / d.sum(dim=-1).view(1, -1).T
-        cumulative_probs = d.cumsum(dim=-1)
-
-        # Remove tokens with cumulative top_p above the threshold (token with 0 are kept)
-        sorted_indices_to_remove = torch.zeros(sorted_indices.shape).bool().to(scores.device)
-        sorted_indices_to_remove[:, :-2] = (cumulative_probs > limit)[:, :]
-
-        # Shift the indices to the right to keep also the first token above the threshold
-        #sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
-
-        # Always keep the first token
-        sorted_indices_to_remove[:, 0] = 0
-
-        # scatter sorted tensors to original indexing
-        indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+        #print(limit)
+        indices_to_remove = scores < limit
         scores = scores.masked_fill(indices_to_remove, self.filter_value)
         return scores
 
@@ -394,6 +376,7 @@ class TopKLogitsWarper(LogitsWarper):
         self.min_tokens_to_keep = min_tokens_to_keep
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+        #print(scores.shape)
         top_k = min(max(self.top_k, self.min_tokens_to_keep), scores.size(-1))  # Safety check
         # Remove all tokens with a probability less than the last token of the top-k
         indices_to_remove = scores < torch.topk(scores, top_k)[0][..., -1, None]
