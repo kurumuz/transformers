@@ -306,7 +306,7 @@ class TopALogitsWarper(LogitsWarper):
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
         probs = torch.nn.functional.softmax(scores, dim=-1)
-        limit = torch.pow(torch.max(probs), 2.0) * 1
+        limit = torch.pow(torch.max(probs), 2.0) * self.z
         #print(probs)
         #print(limit)
         #amount = 0
