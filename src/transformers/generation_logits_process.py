@@ -302,12 +302,24 @@ class TopALogitsWarper(LogitsWarper):
 
         self.z = threshold
         self.filter_value = filter_value
+        print(threshold)
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
         probs = torch.nn.functional.softmax(scores, dim=-1)
-        limit = torch.pow(torch.max(probs), 2.0) * self.z
+        limit = torch.pow(torch.max(probs), 2.0) * 1
+        #print(probs)
         #print(limit)
-        indices_to_remove = scores < limit
+        #amount = 0
+        indices_to_remove = probs < limit
+        #print(indices_to_remove)
+        #print(scores.shape)
+        '''
+        for x in indices_to_remove[0]:
+            if x == True:
+                amount += 1
+        
+        print(amount-143)
+        '''
         scores = scores.masked_fill(indices_to_remove, self.filter_value)
         return scores
 
